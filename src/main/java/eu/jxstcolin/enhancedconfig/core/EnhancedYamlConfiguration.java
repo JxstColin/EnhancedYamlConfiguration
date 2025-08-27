@@ -45,35 +45,7 @@ public abstract class EnhancedYamlConfiguration {
 
             instance.root = instance.loader.load();
 
-            for (Field f : type.getDeclaredFields()) {
-                ConfigKey key = f.getAnnotation(ConfigKey.class);
-                if (key == null) continue;
-
-                f.setAccessible(true);
-                Object defaultVal = f.get(instance);
-
-                Object[] path = pathOf(key.value());
-                CommentedConfigurationNode node = instance.root.node(path);
-
-                if (node.virtual()) {
-                    if (defaultVal != null) {
-                        node.set(defaultVal);
-                    } else {
-                        node.set(Collections.emptyMap());
-                    }
-                }
-
-                Comment comment = f.getAnnotation(Comment.class);
-                if (comment != null && !comment.value().isBlank()) {
-                    node.comment(comment.value());
-                }
-
-                Object loaded = node.raw();
-                if (loaded != null) {
-                    Object value = coerceValue(f.getType(), node);
-                    if (value != null) f.set(instance, value);
-                }
-            }
+            instance.hydrateFields(type, /*writeDefaults=*/true);
 
             instance.loader.save(instance.root);
             return instance;
@@ -86,8 +58,46 @@ public abstract class EnhancedYamlConfiguration {
     public synchronized void reload() {
         try {
             this.root = loader.load();
+            this.hydrateFields(getClass(), /*writeDefaults=*/false);
         } catch (ConfigurateException e) {
             throw new RuntimeException("Failed to reload " + filePath, e);
+        }
+    }
+
+    protected void hydrateFields(Class<?> type, boolean writeDefaults) {
+        try {
+            for (Field f : type.getDeclaredFields()) {
+                ConfigKey key = f.getAnnotation(ConfigKey.class);
+                if (key == null) continue;
+
+                f.setAccessible(true);
+                Object[] path = pathOf(key.value());
+                CommentedConfigurationNode node = this.root.node(path);
+
+                if (writeDefaults && node.virtual()) {
+                    Object defaultVal = f.get(this);
+                    if (defaultVal != null) {
+                        node.set(defaultVal);
+                    } else {
+                        node.set(Collections.emptyMap());
+                    }
+                }
+
+                if (writeDefaults) {
+                    Comment comment = f.getAnnotation(Comment.class);
+                    if (comment != null && !comment.value().isBlank()) {
+                        node.comment(comment.value());
+                    }
+                }
+
+                Object loaded = node.raw();
+                if (loaded != null) {
+                    Object value = coerceValue(f.getType(), node);
+                    if (value != null) f.set(this, value);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to hydrate fields for " + type.getName(), e);
         }
     }
 
