@@ -6,11 +6,13 @@ import eu.jxstcolin.enhancedconfig.annotations.ConfigurationSettings;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.serialize.SerializationException;
+import org.spongepowered.configurate.yaml.NodeStyle;
 import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 
 public abstract class EnhancedYamlConfiguration {
 
@@ -35,7 +37,11 @@ public abstract class EnhancedYamlConfiguration {
 
             T instance = type.getDeclaredConstructor().newInstance();
             instance.filePath = file;
-            instance.loader = YamlConfigurationLoader.builder().path(file).build();
+            instance.loader = YamlConfigurationLoader.builder()
+                    .path(file)
+                    .indent(2)
+                    .nodeStyle(NodeStyle.BLOCK)
+                    .build();
 
             instance.root = instance.loader.load();
 
@@ -53,7 +59,7 @@ public abstract class EnhancedYamlConfiguration {
                     if (defaultVal != null) {
                         node.set(defaultVal);
                     } else {
-
+                        node.set(Collections.emptyMap());
                     }
                 }
 
