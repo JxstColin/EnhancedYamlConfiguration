@@ -3,6 +3,7 @@ package eu.jxstcolin.enhancedconfig.core;
 import eu.jxstcolin.enhancedconfig.annotations.Comment;
 import eu.jxstcolin.enhancedconfig.annotations.ConfigKey;
 import eu.jxstcolin.enhancedconfig.annotations.ConfigurationSettings;
+import io.leangen.geantyref.TypeToken;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.serialize.SerializationException;
@@ -45,7 +46,7 @@ public abstract class EnhancedYamlConfiguration {
 
             instance.root = instance.loader.load();
 
-            instance.hydrateFields(type, /*writeDefaults=*/true);
+            instance.hydrateFields(type, true);
 
             instance.loader.save(instance.root);
             return instance;
@@ -58,7 +59,7 @@ public abstract class EnhancedYamlConfiguration {
     public synchronized void reload() {
         try {
             this.root = loader.load();
-            this.hydrateFields(getClass(), /*writeDefaults=*/false);
+            this.hydrateFields(getClass(), false);
         } catch (ConfigurateException e) {
             throw new RuntimeException("Failed to reload " + filePath, e);
         }
@@ -92,7 +93,7 @@ public abstract class EnhancedYamlConfiguration {
 
                 Object loaded = node.raw();
                 if (loaded != null) {
-                    Object value = coerceValue(f.getType(), node);
+                    Object value = readNodeValue(f, node);
                     if (value != null) f.set(this, value);
                 }
             }
@@ -140,15 +141,11 @@ public abstract class EnhancedYamlConfiguration {
         return out;
     }
 
-    @SuppressWarnings("unchecked")
-    private static Object coerceValue(Class<?> target, CommentedConfigurationNode node) {
+    private static Object readNodeValue(Field field, CommentedConfigurationNode node) {
         try {
-            if (target == String.class) return node.getString();
-            if (target == int.class || target == Integer.class) return node.getInt();
-            if (target == long.class || target == Long.class) return node.getLong();
-            if (target == boolean.class || target == Boolean.class) return node.getBoolean();
-            if (target == double.class || target == Double.class) return node.getDouble();
-            return node.get((Class<Object>) target);
+            java.lang.reflect.Type genericType = field.getGenericType();
+            TypeToken<?> token = TypeToken.get(genericType);
+            return node.get(token);
         } catch (SerializationException e) {
             return null;
         }
